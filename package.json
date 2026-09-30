@@ -1,0 +1,9 @@
+{
+  "name":"factor-impostor",
+  "version":"1.0.0",
+  "private":true,
+  "description":"Factor Impostor mathematics game",
+  "scripts":{"build":"echo Factor Impostor uses static web files","cap:add:android":"npx cap add android","cap:sync":"npx cap sync"},
+  "dependencies":{"@capacitor/core":"8.5.2","@capacitor/android":"8.5.2"},
+  "devDependencies":{"@capacitor/cli":"8.5.2","@capacitor/assets":"3.0.5"}
+}
