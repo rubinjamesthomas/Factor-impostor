@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Factor Impostor</title>
+<style>
+:root{--navy:#071a3d;--blue:#1264d6;--red:#ef3035;--gold:#ffc928;--cream:#fff8e8;--green:#25b96f}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(145deg,#06152f,#102d62);font-family:Arial,Helvetica,sans-serif;color:#fff;min-height:100vh}
+#app{max-width:900px;margin:0 auto;padding:12px}
+.banner{width:100%;border-radius:18px;display:block;border:4px solid #ef3035;box-shadow:0 6px 18px #0008}
+.panel{background:#0b2148ee;border:2px solid #3b6fae;border-radius:18px;padding:18px;margin-top:14px;box-shadow:0 8px 20px #0005}
+h1,h2,h3{margin:0 0 10px;text-align:center} .sub{text-align:center;color:#dbe7ff;margin:4px 0 16px}
+.factor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+.factor{min-height:52px;border:2px solid #6689b9;border-radius:12px;background:#102f5c;color:#fff;font-size:18px;font-weight:800}
+.factor.selected{background:#ffc928;color:#071a3d;border-color:#fff}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+.setting{background:#102f5c;border-radius:14px;padding:12px;text-align:center}
+.setting label{display:block;font-size:13px;color:#cfe0ff;font-weight:700;margin-bottom:6px}
+.setting select{font-size:20px;font-weight:800;width:100%;padding:9px;border-radius:9px}
+.primary,.secondary{width:100%;border:0;border-radius:14px;padding:15px;font-size:20px;font-weight:900;cursor:pointer}
+.primary{background:#ffc928;color:#071a3d}.secondary{background:#1b4d88;color:white;margin-top:10px}
+.hidden{display:none!important}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.hudbox{background:#102f5c;border-radius:12px;padding:10px;text-align:center;font-weight:800}
+.lives{letter-spacing:3px;font-size:22px}.round{text-align:center;font-weight:900;color:#ffc928}
+.factor-title{text-align:center;font-size:28px;font-weight:900;margin:5px 0 16px}
+.instructions{text-align:center;color:#dbe7ff;margin-bottom:12px}
+.numbers{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.number{aspect-ratio:1/1;border:3px solid #e6edf9;border-radius:16px;background:#fff;color:#071a3d;font-size:clamp(25px,7vw,52px);font-weight:900;cursor:pointer;box-shadow:0 5px 0 #8090a6}
+.number.selected{background:#ffc928;border-color:#ef3035;transform:translateY(3px);box-shadow:0 2px 0 #9c2226}
+.number.correct{background:#42d78d;border-color:#fff}
+.number.wrong{background:#ff5b5f;color:white}
+.check{margin-top:16px}.feedback{text-align:center;min-height:30px;font-weight:900;font-size:18px;margin:10px 0}.avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px;border:3px solid #ffc928}
+.small{font-size:13px;color:#cfe0ff;text-align:center;margin-top:10px}
+
+.result-badge{margin:-2px auto 7px;width:100%;aspect-ratio:1.5/1;border-radius:10px;overflow:hidden;border:2px solid #ffc928;background:#081a39}
+.result-badge img{width:100%;height:100%;object-fit:cover;display:block}
+.number-wrap{display:flex;flex-direction:column;min-width:0}
+.number-wrap .number{width:100%}
+@media(max-width:600px){#app{padding:8px}.panel{padding:13px}.factor-grid{grid-template-columns:repeat(4,1fr)}.numbers{gap:6px}.number{border-radius:12px}.settings{gap:8px}.hud{font-size:13px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="setup">
+    <img class="banner" src="factor-impostor-banner.png" alt="Factor Impostor detective banner">
+    <div class="panel">
+      <h2>BUILD YOUR CASE</h2>
+      <div class="sub">Select the multiplication facts you want to investigate.</div>
+      <div id="factors" class="factor-grid"></div>
+      <div class="settings">
+        <div class="setting"><label for="rounds">ROUNDS</label><select id="rounds"></select></div>
+        <div class="setting"><label for="lives">LIVES</label><select id="lives"></select></div>
+      </div>
+      <button id="start" class="primary">START INVESTIGATION</button>
+      <div class="small">Default: 10 rounds · 3 lives</div>
+    </div>
+  </section>
+
+  <section id="game" class="hidden">
+    <div class="hud">
+      <div class="hudbox">ROUND<br><span id="roundLabel"></span></div>
+      <div class="hudbox">LIVES<br><span id="lifeLabel" class="lives"></span></div>
+      <div class="hudbox">CASES SOLVED<br><span id="scoreLabel">0</span></div>
+    </div>
+    <div class="panel">
+<div class="factor-title">MULTIPLES OF <span id="factorLabel"></span></div>
+      <div class="instructions">Tap every <b>IMPOSTOR</b> — then press CHECK CASE.</div>
+      <div id="numbers" class="numbers"></div>
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+      <button id="check" class="primary check">CHECK CASE</button>
+      <button id="next" class="secondary hidden">NEXT CASE</button>
+    </div>
+  </section>
+
+  <section id="end" class="hidden">
+    <div class="panel">
+      <h2 id="endTitle"></h2>
+      <p id="endText" class="sub"></p>
+      <button id="restart" class="primary">NEW INVESTIGATION</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+const factors=[2,3,4,5,6,7,8,9,10,11,12];
+const selected=new Set();
+const $=id=>document.getElementById(id);
+let rounds=10,lives=3,round=0,score=0,currentFactor=2,currentNumbers=[],submitted=false;
+
+function shuffle(a){return a.sort(()=>Math.random()-0.5)}
+function unique(arr){return [...new Set(arr)]}
+function isMultiple(n,f){return n%f===0}
+function makeRound(){
+  currentFactor=factors.filter(f=>selected.has(f))[Math.floor(Math.random()*selected.size)];
+  const countMultiples=1+Math.floor(Math.random()*3); // 1-3 genuine multiples
+  const countImpostors=5-countMultiples;
+  const max= Math.random()<0.65 ? 120 : 300;
+  let mult=unique(Array.from({length:80},()=>currentFactor*(2+Math.floor(Math.random()*Math.max(2,Math.floor(max/currentFactor)-1)))));
+  mult=mult.filter(n=>n>=currentFactor && n<=max);
+  if(mult.length<countMultiples) mult=unique(mult.concat([currentFactor*2,currentFactor*3,currentFactor*4]));
+  mult=shuffle(mult).slice(0,countMultiples);
+  const impostors=[];
+  while(impostors.length<countImpostors){
+    const n=10+Math.floor(Math.random()*(max-9));
+    if(!isMultiple(n,currentFactor) && !impostors.includes(n)) impostors.push(n);
+  }
+  currentNumbers=shuffle([...mult,...impostors]).map(n=>({n,impostor:!isMultiple(n,currentFactor),selected:false}));
+  submitted=false;
+}
+function renderFactors(){
+  $("factors").innerHTML="";
+  factors.forEach(f=>{
+    const b=document.createElement("button"); b.type="button"; b.className="factor"+(selected.has(f)?" selected":""); b.textContent=f+"×";
+    b.addEventListener("click",()=>{if(selected.has(f)){if(selected.size>1)selected.delete(f)}else selected.add(f);b.classList.toggle("selected",selected.has(f));});
+    $("factors").appendChild(b);
+  });
+}
+function fillSelect(el,max,def){
+  for(let i=1;i<=max;i++){const o=document.createElement("option");o.value=i;o.textContent=i;if(i===def)o.selected=true;el.appendChild(o)}
+}
+function updateHud(){
+  $("roundLabel").textContent=round+" / "+rounds;
+  $("lifeLabel").textContent="♥".repeat(lives)+"♡".repeat(Math.max(0,Number($("lives").value)-lives));
+  $("scoreLabel").textContent=score;
+}
+function renderRound(){
+  $("roundLabel").textContent=round+" / "+rounds;
+  $("factorLabel").textContent=currentFactor+"×";
+  $("feedback").textContent="";
+  $("numbers").innerHTML="";
+  currentNumbers.forEach((item,i)=>{
+    const wrap=document.createElement("div");
+    wrap.className="number-wrap";
+    const b=document.createElement("button");
+    b.type="button";b.className="number";b.textContent=item.n;
+    b.addEventListener("click",()=>{
+      if(submitted)return;
+      item.selected=!item.selected;
+      b.classList.toggle("selected",item.selected);
+    });
+    b.dataset.index=i;
+    wrap.appendChild(b);
+    $("numbers").appendChild(wrap);
+  });
+  $("check").classList.remove("hidden");$("next").classList.add("hidden");
+  updateHud();
+}
+function showInlineResults(){
+  currentNumbers.forEach((x,i)=>{
+    const wrap=$("numbers").children[i];
+    if(!x.impostor)return;
+
+    const badge=document.createElement("div");
+    badge.className="result-badge";
+    const img=document.createElement("img");
+    const caught=x.selected;
+    img.src=caught ? "impostor-caught.png" : "impostor-escaped.png";
+    img.alt=caught ? "Impostor caught" : "Impostor escaped";
+    badge.appendChild(img);
+    wrap.insertBefore(badge,wrap.firstChild);
+  });
+}
+
+function submit(){
+  if(submitted)return;
+  submitted=true;
+
+  const correct=currentNumbers.every(x => x.selected === x.impostor);
+
+  currentNumbers.forEach((x,i)=>{
+    const el=$("numbers").children[i].querySelector(".number");
+    el.classList.remove("selected","correct","wrong");
+
+    if(x.impostor){
+      if(x.selected) el.classList.add("correct");
+      else el.classList.add("wrong");
+    } else if(x.selected){
+      el.classList.add("wrong");
+    }
+  });
+
+  if(correct){
+    score++;
+    $("feedback").textContent="CASE SOLVED! Every impostor was identified.";
+  } else {
+    lives--;
+    $("feedback").textContent="CASE COMPROMISED! You lost one life.";
+  }
+
+  updateHud();
+  showInlineResults();
+
+  $("check").classList.add("hidden");
+  $("next").classList.remove("hidden");
+  $("next").textContent =
+    (lives<=0 || round>=rounds) ? "VIEW FINAL RESULT" : "NEXT ROUND";
+}
+function nextRound(){
+  if(lives<=0 || round>=rounds){finish();return}
+  round++;
+  makeRound();
+  renderRound();
+}
+function finish(){
+  $("game").classList.add("hidden");$("end").classList.remove("hidden");
+  if(lives>0){$("endTitle").textContent="CASE CLOSED!";$("endText").textContent=`You survived all ${rounds} rounds and solved ${score} cases.`}
+  else{$("endTitle").textContent="INVESTIGATION OVER";$("endText").textContent=`You ran out of lives after ${round} rounds. You solved ${score} cases.`}
+}
+$("start").addEventListener("click",()=>{
+  if(selected.size===0){
+    alert("Please select at least one factor.");
+    return;
+  }
+  rounds=Number($("rounds").value);lives=Number($("lives").value);
+  $("setup").classList.add("hidden");$("game").classList.remove("hidden");$("end").classList.add("hidden");
+  round=1;score=0;makeRound();renderRound();
+});
+$("check").addEventListener("click",submit);
+$("next").addEventListener("click",nextRound);
+$("restart").addEventListener("click",()=>{ $("end").classList.add("hidden");$("setup").classList.remove("hidden"); });
+fillSelect($("rounds"),20,10);fillSelect($("lives"),6,3);renderFactors();
+})();
+</script>
+</body>
+</html>
