@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factor Impostor</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#071b40;color:white;font-family:Arial,sans-serif}
+.app{max-width:900px;margin:auto;padding:10px}
+.banner{width:100%;display:block;border:4px solid #ef3035;border-radius:18px}
+.panel{background:#0c2854;border:3px solid #3976b8;border-radius:18px;padding:14px;margin-top:12px}
+h2{text-align:center;margin:5px 0 12px}
+.sub{text-align:center;color:#dce8ff}
+.factor-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}
+.factor{padding:12px 4px;border-radius:10px;border:2px solid #668bb9;background:#143b68;color:#fff;font-size:18px;font-weight:900}
+.factor.selected{background:#ffc928;color:#071b40;border-color:#fff}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.setting{background:#143b68;border-radius:10px;padding:10px;text-align:center;margin-top:8px}
+.setting.full{grid-column:1/-1}
+label{display:block;font-size:12px;font-weight:900;margin-bottom:5px}
+select{width:100%;padding:8px;border-radius:8px;font-weight:900;font-size:17px}
+button{font-family:inherit;cursor:pointer}
+.primary,.next{width:100%;border:0;border-radius:13px;padding:15px;font-size:20px;font-weight:900;margin-top:12px}
+.primary{background:#ffc928;color:#071b40}
+.next{background:#2864a3;color:white}
+.hidden{display:none!important}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hudbox{background:#143b68;border-radius:11px;padding:10px;text-align:center;font-weight:900}
+.hudbox span{font-size:18px}
+.title{text-align:center;font-size:clamp(27px,7vw,42px);font-weight:900;margin:18px 0 10px}
+.instructions{text-align:center;font-size:18px;color:#dce8ff;margin-bottom:15px}
+.numbers{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.number-card{text-align:center}
+.number{width:100%;aspect-ratio:1;border-radius:14px;border:3px solid #eef3fa;background:white;color:#071b40;font-size:clamp(24px,6vw,48px);font-weight:900;box-shadow:0 5px 0 #8495aa}
+.number.selected{background:#ffc928;border-color:#ef3035;transform:translateY(3px);box-shadow:0 2px 0 #a52b2e}
+.number.correct{background:#38d487}
+.number.wrong{background:#ff6065;color:white}
+.result{display:none;margin-bottom:8px}
+.result.show{display:block}
+.result img{width:100%;height:210px;object-fit:cover;display:block;border:3px solid #ffc928;border-radius:12px}
+.result-label{text-align:center;font-weight:900;font-size:16px;padding:5px 2px}
+.feedback{text-align:center;font-size:19px;font-weight:900;min-height:30px;margin:12px 0}
+.score{text-align:center;color:#dce8ff;font-size:14px;margin:8px}
+.end{text-align:center}
+@media(max-width:600px){
+ .factor-grid{grid-template-columns:repeat(4,1fr)}
+ .numbers{grid-template-columns:repeat(2,1fr);gap:10px}
+ .result img{height:235px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<section id="setup">
+<img class="banner" src="factor-impostor-banner.png" alt="Factor Impostor">
+<div class="panel">
+<h2>BUILD YOUR CASE</h2>
+<div class="sub">Select the multiplication facts you want to investigate.</div>
+<div id="factorGrid" class="factor-grid"></div>
+<div class="settings">
+<div class="setting"><label>ROUNDS</label><select id="rounds"></select></div>
+<div class="setting"><label>LIVES</label><select id="lives"></select></div>
+<div class="setting full"><label>DIFFICULTY</label>
+<select id="difficulty">
+<option value="easy">🟢 EASY — 1–100</option>
+<option value="medium">🟡 MEDIUM — 101–1,000</option>
+<option value="hard">🔴 HARD — 1,001–9,000</option>
+</select></div>
+</div>
+<button id="start" class="primary">START INVESTIGATION</button>
+<div class="score">Default: 10 rounds · 3 lives · Easy</div>
+</div>
+</section>
+
+<section id="game" class="hidden">
+<div class="hud">
+<div class="hudbox">ROUND<br><span id="roundText"></span></div>
+<div class="hudbox">LIVES<br><span id="livesText"></span></div>
+<div class="hudbox">DIFFICULTY<br><span id="difficultyText"></span></div>
+</div>
+<div class="score">CASES SOLVED: <b id="scoreText">0</b></div>
+<div class="panel">
+<div class="title">MULTIPLES OF <span id="factorText"></span></div>
+<div class="instructions">Tap every <b>IMPOSTOR</b> — then press <b>CHECK CASE</b>.</div>
+<div id="numbers" class="numbers"></div>
+<div id="feedback" class="feedback"></div>
+<button id="check" class="primary">CHECK CASE</button>
+<button id="next" class="next hidden">NEXT ROUND</button>
+</div>
+</section>
+
+<section id="finish" class="hidden">
+<div class="panel end">
+<h2 id="finishTitle"></h2>
+<div id="finishText" class="sub"></div>
+<button id="restart" class="primary">NEW INVESTIGATION</button>
+</div>
+</section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var FACTORS=[2,3,4,5,6,7,8,9,10,11,12];
+var chosen=[];
+var rounds=10,lives=3,round=0,score=0,factor=2,items=[],checked=false;
+
+function $(id){return document.getElementById(id);}
+function shuffle(a){
+ for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
+ return a;
+}
+function isMultiple(n,f){return n%f===0;}
+
+function setupSelect(id,max,value){
+ var s=$(id);
+ for(var i=1;i<=max;i++){
+  var o=document.createElement("option");
+  o.value=i;o.textContent=i;
+  if(i===value)o.selected=true;
+  s.appendChild(o);
+ }
+}
+
+function buildFactors(){
+ var box=$("factorGrid");
+ FACTORS.forEach(function(f){
+  var b=document.createElement("button");
+  b.className="factor";
+  b.type="button";
+  b.textContent=f+"×";
+  b.onclick=function(){
+   var pos=chosen.indexOf(f);
+   if(pos>=0){chosen.splice(pos,1);b.classList.remove("selected");}
+   else{chosen.push(f);b.classList.add("selected");}
+  };
+  box.appendChild(b);
+ });
+}
+
+function makeCase(){
+ factor=chosen[Math.floor(Math.random()*chosen.length)];
+
+ var ranges={
+  easy:[1,100],
+  medium:[101,1000],
+  hard:[1001,9000]
+ };
+ var range=ranges[$("difficulty").value];
+ var min=range[0],max=range[1];
+
+ var genuineCount=1+Math.floor(Math.random()*3);
+ var impostorCount=5-genuineCount;
+ var genuine=[];
+ var lo=Math.ceil(min/factor);
+ var hi=Math.floor(max/factor);
+
+ while(genuine.length<genuineCount){
+  var n=factor*(lo+Math.floor(Math.random()*(hi-lo+1)));
+  if(genuine.indexOf(n)<0)genuine.push(n);
+ }
+
+ var impostors=[];
+ while(impostors.length<impostorCount){
+  var x=min+Math.floor(Math.random()*(max-min+1));
+  if(!isMultiple(x,factor)&&impostors.indexOf(x)<0&&genuine.indexOf(x)<0)impostors.push(x);
+ }
+
+ items=shuffle(genuine.concat(impostors)).map(function(n){
+  return {number:n,impostor:!isMultiple(n,factor),selected:false};
+ });
+}
+
+function updateHud(){
+ $("roundText").textContent=round+" / "+rounds;
+ $("livesText").textContent="♥".repeat(lives)+"♡".repeat(Math.max(0,Number($("lives").value)-lives));
+ $("difficultyText").textContent=$("difficulty").value.toUpperCase();
+ $("scoreText").textContent=score;
+ $("factorText").textContent=factor+"×";
+}
+
+function renderCase(){
+ checked=false;
+ var box=$("numbers");
+ box.innerHTML="";
+ $("feedback").textContent="";
+ $("check").classList.remove("hidden");
+ $("next").classList.add("hidden");
+
+ items.forEach(function(item,index){
+  var card=document.createElement("div");
+  card.className="number-card";
+
+  var result=document.createElement("div");
+  result.className="result";
+  result.id="result-"+index;
+
+  var img=document.createElement("img");
+  img.alt="";
+  result.appendChild(img);
+
+  var label=document.createElement("div");
+  label.className="result-label";
+  result.appendChild(label);
+
+  var button=document.createElement("button");
+  button.type="button";
+  button.className="number";
+  button.textContent=item.number;
+  button.onclick=function(){
+   if(checked)return;
+   item.selected=!item.selected;
+   button.classList.toggle("selected",item.selected);
+  };
+
+  card.appendChild(result);
+  card.appendChild(button);
+  box.appendChild(card);
+ });
+ updateHud();
+}
+
+function checkCase(){
+ if(checked)return;
+ checked=true;
+
+ var perfect=true;
+
+ items.forEach(function(item,index){
+  var card=$("numbers").children[index];
+  var button=card.querySelector(".number");
+  var result=card.querySelector(".result");
+  var img=result.querySelector("img");
+  var label=result.querySelector(".result-label");
+
+  button.classList.remove("selected","correct","wrong");
+
+  if(item.impostor){
+   if(item.selected){
+    button.classList.add("correct");
+    img.src="impostor-caught.png";
+    label.textContent="IMPOSTOR CAUGHT!";
+   }else{
+    button.classList.add("wrong");
+    img.src="impostor-escaped.png";
+    label.textContent="IMPOSTOR ESCAPED!";
+    perfect=false;
+   }
+   result.classList.add("show");
+  }else if(item.selected){
+   button.classList.add("wrong");
+   perfect=false;
+  }
+ });
+
+ if(perfect){
+  score++;
+  $("feedback").textContent="CASE SOLVED! Every impostor was identified.";
+ }else{
+  lives--;
+  $("feedback").textContent="CASE COMPROMISED! You lost one life.";
+ }
+
+ updateHud();
+ $("check").classList.add("hidden");
+ $("next").classList.remove("hidden");
+
+ if(lives<=0 || round>=rounds){
+  $("next").textContent="VIEW FINAL RESULT";
+ }else{
+  $("next").textContent="NEXT ROUND";
+ }
+}
+
+function goNext(){
+ if(lives<=0 || round>=rounds){
+  showFinish();
+  return;
+ }
+ round++;
+ makeCase();
+ renderCase();
+}
+
+function showFinish(){
+ $("game").classList.add("hidden");
+ $("finish").classList.remove("hidden");
+ if(lives>0){
+  $("finishTitle").textContent="CASE CLOSED!";
+  $("finishText").textContent="You survived all "+rounds+" rounds and solved "+score+" cases.";
+ }else{
+  $("finishTitle").textContent="INVESTIGATION OVER";
+  $("finishText").textContent="You ran out of lives after "+round+" rounds. You solved "+score+" cases.";
+ }
+}
+
+$("start").onclick=function(){
+ if(chosen.length===0){
+  alert("Please select at least one factor.");
+  return;
+ }
+ rounds=Number($("rounds").value);
+ lives=Number($("lives").value);
+ round=1;
+ score=0;
+ $("setup").classList.add("hidden");
+ $("finish").classList.add("hidden");
+ $("game").classList.remove("hidden");
+ makeCase();
+ renderCase();
+};
+
+$("check").onclick=checkCase;
+$("next").onclick=goNext;
+$("restart").onclick=function(){
+ $("finish").classList.add("hidden");
+ $("setup").classList.remove("hidden");
+};
+
+setupSelect("rounds",20,10);
+setupSelect("lives",6,3);
+buildFactors();
+
+})();
+</script>
+</body>
+</html>
