@@ -29,13 +29,19 @@ jobs:
           npm install
           npm install --save-dev typescript
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Prepare web files
+        run: |
+          mkdir -p www
+          cp index.html www/
+          cp *.png www/
 
       - name: Prepare app icon
         run: |
           mkdir -p resources
           cp icon.png resources/icon.png
+
+      - name: Add Android platform
+        run: npx cap add android
 
       - name: Generate app icons
         run: npx capacitor-assets generate --android
